@@ -1,0 +1,17 @@
+{
+  "name": "sukunimitin",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "./index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "foswig": "^1.1.1",
+    "node-fetch": "^1.7.2",
+    "xlsx": "^0.11.2"
+  }
+}
