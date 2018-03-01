@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Sukunimitin</title>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.12.3/xlsx.core.min.js"></script>
+	<script type="text/javascript">
+		"use strict";
+		const CHAIN_SIZE = 3;
+		const MAX_LENGTH = 10;
+		const NUMBER_OF_NAMES = 10;
+
+		const storageKey = "sukunimitilasto.xlsx";
+		const delimiter = ",";
+		const nameListUrl = 'https://www.avoindata.fi/data/dataset/57282ad6-3ab1-48fb-983a-8aba5ff8d29a/resource/d25831d1-82a9-476f-8f7c-374c348efc14/download/sukunimitilasto-2017-09-04-vrk.xlsx';
+		
+		/* Bootstrapping */
+		window.onload = () =>
+			loadNames()
+				.then(createModel)
+				.then(initUI)
+				.catch(console.error);
+
+		/* Source data handling */
+		function loadDataRemote() {
+			return fetch(nameListUrl)
+				.then(response => response.blob())
+				.then(blob => new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.addEventListener("loadend", () => resolve(new Uint8Array(reader.result)));
+					reader.addEventListener("onerror", reject);
+					reader.readAsArrayBuffer(blob);
+				}))
+				.then(data => XLSX.read(data, {type: 'array'}))
+		        .then(workbook => workbook.Sheets['Nimet'])
+		        .then(worksheet => XLSX.utils.sheet_to_json(worksheet))
+		        .then(json => json.map(row => row['Sukunimi']));
+		}
+
+		function loadDataLocal() {
+			const data = localStorage.getItem(storageKey);
+			return data
+				? Promise.resolve(data.split(delimiter))
+				: Promise.reject();
+		}
+
+		function storeDataLocal(data) {
+			localStorage.setItem(storageKey, data.join(delimiter));
+			return Promise.resolve(data);
+		}
+
+		function loadNames() {
+			return loadDataLocal()
+				.catch(() => loadDataRemote().then(storeDataLocal));
+		}
+
+		/* Name validation */
+		// TODO
+
+		/* Model creation */
+		function createModel(names) {
+			const prefixes = {};
+			names.forEach(name => {
+				for (let characterIndex = 0 ; characterIndex <= name.length ; characterIndex++ ) {
+					const prefix = name.slice(Math.max(characterIndex-CHAIN_SIZE, 0), characterIndex);
+					prefixes[prefix] = prefixes[prefix] || [];
+					prefixes[prefix].push(name[characterIndex]);
+				}
+			});
+			return {prefixes, names};
+		}
+
+		/* Name generation */
+		function generateName(model) {
+			let name = '', prefix = '';
+			do {
+				const choices = model.prefixes[prefix] || [];
+				const selectedIndex = Math.floor(Math.random() * choices.length);
+				const selectedCharacter = choices[selectedIndex];
+				if (!selectedCharacter) {
+					break;
+				}
+				name += selectedCharacter;
+				prefix += selectedCharacter;
+				if (prefix.length > CHAIN_SIZE) {
+					prefix = prefix.slice(1);
+				}
+			} while (name.length < MAX_LENGTH);
+
+			if (model.names.indexOf(name) >= 0) {
+				return '--' + name;
+			}
+
+			return name;
+		}
+
+		/* UI control */
+		function initUI(model) {
+			generateNewNames(model);
+			document.body.addEventListener("click", () => generateNewNames(model));
+		}
+
+		function generateNewNames(model) {
+			clearNames();
+			for (let i = 0 ; i < NUMBER_OF_NAMES ; i++) {
+				displayName(generateName(model));
+			}
+		}
+
+		function clearNames() {
+			document.getElementById('names').innerHTML = '';
+		}
+
+		function displayName(name) {
+			document.getElementById('names').innerHTML += '<li>' + name + '</li>';
+		}
+
+	</script>
+
+	<style type="text/css">
+		html, body {
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			padding: 20px;
+		}
+	</style>
+</head>
+<body>
+	<h1>Sukunimitin</h1>
+	<ul id="names"></ul>
+</body>
+</html>
