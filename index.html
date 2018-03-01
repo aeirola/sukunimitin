@@ -2,6 +2,8 @@
 <html>
 <head>
 	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
 	<title>Sukunimitin</title>
 
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.12.3/xlsx.core.min.js"></script>
@@ -14,12 +16,12 @@
 		const storageKey = "sukunimitilasto.xlsx";
 		const delimiter = ",";
 		const nameListUrl = 'https://www.avoindata.fi/data/dataset/57282ad6-3ab1-48fb-983a-8aba5ff8d29a/resource/d25831d1-82a9-476f-8f7c-374c348efc14/download/sukunimitilasto-2017-09-04-vrk.xlsx';
+		const nameValidateUrl = 'https://crossorigin.me/https://verkkopalvelu.vrk.fi/nimipalvelu/nimipalvelu_sukunimihaku.asp?L=1';
 		
 		/* Bootstrapping */
 		window.onload = () =>
 			loadNames()
-				.then(createModel)
-				.then(initUI)
+				.then(names => createModel(names).then(model => initUI(model, names)))
 				.catch(console.error);
 
 		/* Source data handling */
@@ -56,26 +58,32 @@
 		}
 
 		/* Name validation */
-		// TODO
+		function validateName(name, names) {
+			if (names.indexOf(name) >= 0) {
+				return Promise.reject(name);
+			} else {
+				return Promise.resolve(name);
+			}
+		}
 
 		/* Model creation */
 		function createModel(names) {
-			const prefixes = {};
+			const model = {};
 			names.forEach(name => {
 				for (let characterIndex = 0 ; characterIndex <= name.length ; characterIndex++ ) {
 					const prefix = name.slice(Math.max(characterIndex-CHAIN_SIZE, 0), characterIndex);
-					prefixes[prefix] = prefixes[prefix] || [];
-					prefixes[prefix].push(name[characterIndex]);
+					model[prefix] = model[prefix] || [];
+					model[prefix].push(name[characterIndex]);
 				}
 			});
-			return {prefixes, names};
+			return Promise.resolve(model);
 		}
 
 		/* Name generation */
 		function generateName(model) {
 			let name = '', prefix = '';
 			do {
-				const choices = model.prefixes[prefix] || [];
+				const choices = model[prefix] || [];
 				const selectedIndex = Math.floor(Math.random() * choices.length);
 				const selectedCharacter = choices[selectedIndex];
 				if (!selectedCharacter) {
@@ -88,23 +96,24 @@
 				}
 			} while (name.length < MAX_LENGTH);
 
-			if (model.names.indexOf(name) >= 0) {
-				return '--' + name;
-			}
-
-			return name;
+			return Promise.resolve(name);
 		}
 
 		/* UI control */
-		function initUI(model) {
-			generateNewNames(model);
-			document.body.addEventListener("click", () => generateNewNames(model));
+		function initUI(model, names) {
+			generateNewNames(model, names);
+			document.addEventListener("click", () => generateNewNames(model, names));
 		}
 
-		function generateNewNames(model) {
+		function generateNewNames(model, names) {
 			clearNames();
 			for (let i = 0 ; i < NUMBER_OF_NAMES ; i++) {
-				displayName(generateName(model));
+				generateName(model)
+					.then(name => validateName(name, names))
+					.then(
+						name => displayName(name, 'available'),
+						name => displayName(name, 'unavailable')
+					);
 			}
 		}
 
@@ -112,18 +121,35 @@
 			document.getElementById('names').innerHTML = '';
 		}
 
-		function displayName(name) {
-			document.getElementById('names').innerHTML += '<li>' + name + '</li>';
+		function displayName(name, status) {
+			document.getElementById('names').innerHTML += '<li class="' + status + '">' + name + '</li>';
 		}
 
 	</script>
 
 	<style type="text/css">
-		html, body {
-			width: 100%;
+		html {
 			height: 100%;
+		}
+		body {
+			width: 100%;
 			margin: 0;
-			padding: 20px;
+
+			font-family: monospace;
+			text-align: center;
+			font-size: 16pt;
+		}
+
+		ul {
+			padding: 0;
+		}
+
+		li {
+			list-style: none;
+		}
+
+		.unavailable {
+			opacity: 0.2;
 		}
 	</style>
 </head>
