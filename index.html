@@ -10,13 +10,13 @@
 	<script type="text/javascript">
 		"use strict";
 		const CHAIN_SIZE = 3;
-		const MAX_LENGTH = 10;
+		const MAX_LENGTH = 15;
 		const NUMBER_OF_NAMES = 10;
 
 		const storageKey = "sukunimitilasto.xlsx";
 		const delimiter = ",";
 		const nameListUrl = 'https://www.avoindata.fi/data/dataset/57282ad6-3ab1-48fb-983a-8aba5ff8d29a/resource/d25831d1-82a9-476f-8f7c-374c348efc14/download/sukunimitilasto-2017-09-04-vrk.xlsx';
-		const nameValidateUrl = 'https://crossorigin.me/https://verkkopalvelu.vrk.fi/nimipalvelu/nimipalvelu_sukunimihaku.asp?L=1';
+		const nameValidateUrl = 'https://sukunimitin-api.herokuapp.com/isAvailable';
 		
 		/* Bootstrapping */
 		window.onload = () =>
@@ -39,14 +39,12 @@
 		        .then(worksheet => XLSX.utils.sheet_to_json(worksheet))
 		        .then(json => json.map(row => row['Sukunimi']));
 		}
-
 		function loadDataLocal() {
 			const data = localStorage.getItem(storageKey);
 			return data
 				? Promise.resolve(data.split(delimiter))
 				: Promise.reject();
 		}
-
 		function storeDataLocal(data) {
 			localStorage.setItem(storageKey, data.join(delimiter));
 			return Promise.resolve(data);
@@ -58,12 +56,23 @@
 		}
 
 		/* Name validation */
-		function validateName(name, names) {
+		function validateNameRemote(name) {
+			return fetch(nameValidateUrl + '?name=' + name)
+				.then(response => response.json())
+				.then(data => data.available
+					? Promise.resolve(name)
+					: Promise.reject(name));
+		}
+		function validateNameLocal(name, names) {
 			if (names.indexOf(name) >= 0) {
 				return Promise.reject(name);
 			} else {
 				return Promise.resolve(name);
 			}
+		}
+		function validateName(name, names) {
+			return validateNameLocal(name, names)
+				.then(() => validateNameRemote(name));
 		}
 
 		/* Model creation */
@@ -94,9 +103,13 @@
 				if (prefix.length > CHAIN_SIZE) {
 					prefix = prefix.slice(1);
 				}
-			} while (name.length < MAX_LENGTH);
+			} while (name.length <= MAX_LENGTH);
 
-			return Promise.resolve(name);
+			if (name.length > MAX_LENGTH) {
+				return Promise.reject();
+			} else {
+				return Promise.resolve(name);
+			}
 		}
 
 		/* UI control */
@@ -109,11 +122,16 @@
 			clearNames();
 			for (let i = 0 ; i < NUMBER_OF_NAMES ; i++) {
 				generateName(model)
-					.then(name => validateName(name, names))
-					.then(
-						name => displayName(name, 'available'),
-						name => displayName(name, 'unavailable')
-					);
+					.then(name => {
+						const element = displayName(name);
+						validateName(name, names)
+							.then(
+								() => element.className = 'available',
+								() => element.className = 'unavailable',
+						);
+					},
+					() => undefined, // Name generation failed, ignoring
+				);
 			}
 		}
 
@@ -121,8 +139,11 @@
 			document.getElementById('names').innerHTML = '';
 		}
 
-		function displayName(name, status) {
-			document.getElementById('names').innerHTML += '<li class="' + status + '">' + name + '</li>';
+		function displayName(name) {
+			const element = document.createElement('li');
+			element.appendChild(document.createTextNode(name));
+			document.getElementById('names').appendChild(element);
+			return element;
 		}
 
 	</script>
@@ -130,10 +151,14 @@
 	<style type="text/css">
 		html {
 			height: 100%;
+			width: 100%;
+			display: flex;
 		}
 		body {
-			width: 100%;
+			flex: 1;
 			margin: 0;
+			display: flex;
+			flex-direction: column;
 
 			font-family: monospace;
 			text-align: center;
@@ -143,18 +168,51 @@
 		ul {
 			padding: 0;
 		}
-
 		li {
 			list-style: none;
+			opacity: 0.5;
+		}
+		.available {
+			opacity: 1;
+		}
+		.unavailable {
+			opacity: 0.25;
+			text-decoration: line-through;
 		}
 
-		.unavailable {
-			opacity: 0.2;
+		section {
+			flex-grow: 1;
+		}
+		footer {
+			padding: 2rem;
+			font-size: 50%;
+			opacity: 0.75;
+		}
+		footer p {
+			margin: 0;
+		}
+		footer a {
+			color: black;
 		}
 	</style>
 </head>
 <body>
-	<h1>Sukunimitin</h1>
-	<ul id="names"></ul>
+	<header>
+		<h1>Sukunimitin</h1>
+	</header>
+	<section>
+		<ul id="names"></ul>
+	</section>
+	<footer>
+		<p>
+			Paina lataaksesi lisää nimiä.
+		</p>
+		<p>
+			Lähdeaineisto <a href="https://www.avoindata.fi/data/fi/dataset/none">Väestörekisterikeskuksen sukunimitilasto</a>.
+		</p>
+		<p>
+			Luodut nimet varmistetaan <a href="http://verkkopalvelu.vrk.fi/nimipalvelu/">Väestörekisterikeskuksen nimipalvelusta</a>.
+		</p>
+	</footer>
 </body>
 </html>
