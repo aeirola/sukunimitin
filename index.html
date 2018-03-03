@@ -21,7 +21,10 @@
 		/* Bootstrapping */
 		window.onload = () =>
 			loadNames()
-				.then(names => createModel(names).then(model => initUI(model, names)))
+				.then(names =>
+					createModel(names)
+						.then(model => initUI(model, names))
+				)
 				.catch(console.error);
 
 		/* Source data handling */
@@ -116,6 +119,7 @@
 		function initUI(model, names) {
 			generateNewNames(model, names);
 			document.addEventListener("click", () => generateNewNames(model, names));
+			document.body.className = 'loaded';
 		}
 
 		function generateNewNames(model, names) {
@@ -164,6 +168,12 @@
 			text-align: center;
 			font-size: 16pt;
 		}
+		.loading:before {
+			content: 'Ladataan...';
+			position: absolute;
+			top: 50%;
+			width: 100%;
+		}
 
 		ul {
 			padding: 0;
@@ -196,7 +206,7 @@
 		}
 	</style>
 </head>
-<body>
+<body class="loading">
 	<header>
 		<h1>Sukunimitin</h1>
 	</header>
