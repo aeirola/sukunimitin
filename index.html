@@ -17,6 +17,7 @@
 		const NUMBER_OF_NAMES = parseInt(params.get('amount'), 10) || 10;
 		const SAMENESS = parseFloat(params.get('sameness')) || 1;
 		const HIDE_UNAVAILABLE = params.get('hideUnavailable') == 'true';
+		const BEGIN_WITH = params.get('beginWith') || '';
 
 		const storageKey = "sukunimitilasto.xlsx";
 		const delimiter = ",";
@@ -122,7 +123,8 @@
 
 		/* Name generation */
 		function generateName(model) {
-			let name = '', prefix = '';
+			let name = BEGIN_WITH,
+				prefix = BEGIN_WITH.slice(-CHAIN_SIZE);
 			do {
 				const choices = model[prefix] || [];
 				const selectedWeight = Math.random();
