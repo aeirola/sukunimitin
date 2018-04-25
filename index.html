@@ -18,6 +18,8 @@
 		const SAMENESS = parseFloat(params.get('sameness')) || 1;
 		const HIDE_UNAVAILABLE = params.get('hideUnavailable') == 'true';
 		const BEGIN_WITH = params.get('beginWith') || '';
+		const END_WITH = params.get('endWith') || '';
+		const ATTEMPT_DURATION = parseInt(params.get('attemptDuration'), 10) || 1000;
 
 		const storageKey = "sukunimitilasto.xlsx";
 		const delimiter = ",";
@@ -122,7 +124,7 @@
 		}
 
 		/* Name generation */
-		function generateName(model) {
+		function attemptGenerateName(model) {
 			let name = BEGIN_WITH,
 				prefix = BEGIN_WITH.slice(-CHAIN_SIZE);
 			do {
@@ -141,11 +143,27 @@
 				}
 			} while (name.length <= MAX_LENGTH);
 
-			if (name.length > MAX_LENGTH) {
+			if (
+				name.length > MAX_LENGTH
+				|| !name.endsWith(END_WITH)
+			) {
 				return Promise.reject();
 			} else {
 				return Promise.resolve(name);
 			}
+		}
+
+		function generateName(model, attemptStart) {
+			attemptStart = attemptStart || Date.now();
+			return attemptGenerateName(model)
+				.catch(err => {
+					// Attempt for at most one second
+					if (Date.now() > attemptStart + ATTEMPT_DURATION) {
+						return Promise.reject(err);
+					} else {
+						return generateName(model, attemptStart);	
+					}
+				});
 		}
 
 		/* UI control */
