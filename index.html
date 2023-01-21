@@ -70,20 +70,22 @@
 		function validateNameRemote(name) {
 			return fetch(nameValidateUrl + '?name=' + name)
 				.then(response => response.json())
-				.then(data => data.available
-					? Promise.resolve(name)
-					: Promise.reject(name));
+				.then(data => Promise.resolve(Boolean(data.available)));
 		}
 		function validateNameLocal(name, names) {
 			if (names.indexOf(name) >= 0) {
-				return Promise.reject(name);
+				return Promise.resolve(false);
 			} else {
-				return Promise.resolve(name);
+				return Promise.resolve(true);
 			}
 		}
 		function validateName(name, names) {
 			return validateNameLocal(name, names)
-				.then(() => validateNameRemote(name));
+				.then((valid) =>
+					valid
+						? validateNameRemote(name)
+						: false
+				);
 		}
 
 		/* Model creation */
@@ -181,16 +183,20 @@
 						const element = displayName(name);
 						validateName(name, names)
 							.then(
-								() => element.className = 'available',
-								() => {
-									element.className = 'unavailable';
-									if (HIDE_UNAVAILABLE) {
-										element.style = 'display: none;';
+								(valid) => {
+									if (valid) {
+										element.className = 'available'
 									} else {
-										// Move to bottom
-										element.parentElement.appendChild(element);
+										element.className = 'unavailable';
+										if (HIDE_UNAVAILABLE) {
+											element.style = 'display: none;';
+										} else {
+											// Move to bottom
+											element.parentElement.appendChild(element);
+										}
 									}
 								},
+								(error) => console.warn('Failed to validate name', name, error),
 						);
 					},
 					() => undefined, // Name generation failed, ignoring
