@@ -24,7 +24,7 @@
 		const storageKey = "sukunimitilasto.xlsx";
 		const delimiter = ",";
 		const nameListUrl = 'sukunimitilasto-dvv.xlsx';
-		const nameValidateUrl = 'https://sukunimitin-api.herokuapp.com/isAvailable';
+		const nameValidateUrl = 'https://dli3w5r42nc4i.cloudfront.net/nimipalvelu_sukunimihaku.asp';
 		
 		/* Bootstrapping */
 		window.onload = () =>
@@ -68,24 +68,31 @@
 
 		/* Name validation */
 		function validateNameRemote(name) {
-			return fetch(nameValidateUrl + '?name=' + name)
-				.then(response => response.json())
-				.then(data => Promise.resolve(Boolean(data.available)));
+			return fetch(nameValidateUrl, {
+				method: 'POST',
+				headers:{
+					'Content-Type': 'application/x-www-form-urlencoded'
+				},
+				body: new URLSearchParams({nimi: name}),
+			})
+			.then(response => response.text())
+			.then(body => body.includes(
+				'V&auml;est&ouml;tietoj&auml;rjestelm&auml;ss&auml; ei ole hakemaasi sukunime&auml;',
+			));
 		}
 		function validateNameLocal(name, names) {
 			if (names.indexOf(name) >= 0) {
-				return Promise.resolve(false);
+				return false;
 			} else {
-				return Promise.resolve(true);
+				return true;
 			}
 		}
 		function validateName(name, names) {
-			return validateNameLocal(name, names)
-				.then((valid) =>
-					valid
-						? validateNameRemote(name)
-						: false
-				);
+			if (validateNameLocal(name, names)) {
+				return validateNameRemote(name)
+			} else {
+				return Promise.resolve(false)
+			}
 		}
 
 		/* Model creation */
